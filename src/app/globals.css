@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-pine-50 font-sans text-ink antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid theme("colors.gold.600");
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .field {
+    @apply w-full rounded-lg border border-pine-100 bg-white px-3.5 py-2.5 text-base text-ink placeholder:text-ink/40 focus:border-pine-500 focus:outline-none focus:ring-2 focus:ring-pine-500/25;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-base font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  .btn-gold {
+    @apply btn bg-gold text-pine-900 hover:bg-gold-300;
+  }
+  .btn-pine {
+    @apply btn bg-pine text-white hover:bg-pine-700;
+  }
+  .btn-ghost {
+    @apply btn border border-pine-100 bg-white text-pine hover:bg-pine-50;
+  }
+}
+
+/* ইসলামি জ্যামিতিক নকশা: আটকোণা তারার টাইল, মাঝখানে ফিকে হয়ে যায় */
+.pattern {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Cg fill='none' stroke='%23C8A24A' stroke-opacity='.2' stroke-width='1'%3E%3Crect x='20' y='20' width='40' height='40'/%3E%3Crect x='20' y='20' width='40' height='40' transform='rotate(45 40 40)'/%3E%3C/g%3E%3C/svg%3E");
+  -webkit-mask-image: radial-gradient(ellipse at 50% 40%, transparent 5%, #000 90%);
+  mask-image: radial-gradient(ellipse at 50% 40%, transparent 5%, #000 90%);
+}
+
+.reveal {
+  animation: reveal 0.9s ease-out both;
+}
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    animation: none;
+  }
+}
