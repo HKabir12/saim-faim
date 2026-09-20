@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { pool } from "@/lib/db";
+import { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/db";
 import { likePattern, parseGiftInput } from "@/lib/gifts";
-import type { Gift, ListResponse, Stats } from "@/lib/types";
+import type { Gift, ListResponse } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -13,53 +14,44 @@ export async function GET(req: Request) {
   const village = (sp.get("village") ?? "").trim();
   const requested = Math.max(1, parseInt(sp.get("page") ?? "1", 10) || 1);
 
-  const conds: string[] = [];
-  const params: unknown[] = [];
-  if (name) {
-    params.push(likePattern(name));
-    conds.push(`name ILIKE $${params.length}`);
-  }
-  if (village) {
-    params.push(likePattern(village));
-    conds.push(`village ILIKE $${params.length}`);
-  }
-  const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+  const conds: Prisma.Sql[] = [];
+  if (name) conds.push(Prisma.sql`name ILIKE ${likePattern(name)}`);
+  if (village) conds.push(Prisma.sql`village ILIKE ${likePattern(village)}`);
+  const where = conds.length
+    ? Prisma.sql`WHERE ${Prisma.join(conds, " AND ")}`
+    : Prisma.empty;
 
-  const [countRes, statsRes] = await Promise.all([
-    pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM gifts ${where}`, params),
-    pool.query<Stats>(
-      `SELECT count(*)::int AS "total",
-              (count(*) FILTER (WHERE kind = 'cash'))::int AS "cashCount",
-              (count(*) FILTER (WHERE kind = 'gift'))::int AS "giftCount",
-              COALESCE(sum(amount), 0)::float8 AS "totalAmount"
-       FROM gifts`
-    ),
+  const [countRows, cashCount, giftCount, sum, total] = await Promise.all([
+    prisma.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM gifts ${where}`,
+    prisma.gift.count({ where: { kind: "cash" } }),
+    prisma.gift.count({ where: { kind: "gift" } }),
+    prisma.gift.aggregate({ _sum: { amount: true } }),
+    prisma.gift.count(),
   ]);
 
-  const total = countRes.rows[0].n;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const filteredTotal = countRows[0].n;
+  const totalPages = Math.max(1, Math.ceil(filteredTotal / PAGE_SIZE));
   const page = Math.min(requested, totalPages);
 
-  // সিরিয়াল সবসময় পুরো তালিকার ক্রম অনুযায়ী (সার্চ করলেও বদলায় না)
-  const rowsRes = await pool.query<Gift>(
-    `SELECT * FROM (
-       SELECT id, name, village, kind, amount, gift_item AS "giftItem",
-              ROW_NUMBER() OVER (ORDER BY id)::int AS serial
-       FROM gifts
-     ) t
-     ${where}
-     ORDER BY id
-     LIMIT ${PAGE_SIZE} OFFSET ${(page - 1) * PAGE_SIZE}`,
-    params
-  );
+  // সিরিয়াল সবসময় পুরো তালিকার ক্রম অনুযায়ী
+  const rows = await prisma.$queryRaw<Gift[]>`
+    SELECT * FROM (
+      SELECT id, name, village, kind::text AS kind, amount,
+             gift_item AS "giftItem",
+             ROW_NUMBER() OVER (ORDER BY id)::int AS serial
+      FROM gifts
+    ) t
+    ${where}
+    ORDER BY id
+    LIMIT ${PAGE_SIZE} OFFSET ${(page - 1) * PAGE_SIZE}`;
 
   const body: ListResponse = {
-    rows: rowsRes.rows,
-    total,
+    rows,
+    total: filteredTotal,
     page,
     pageSize: PAGE_SIZE,
     totalPages,
-    stats: statsRes.rows[0],
+    stats: { total, cashCount, giftCount, totalAmount: sum._sum.amount ?? 0 },
   };
   return NextResponse.json(body);
 }
@@ -68,11 +60,9 @@ export async function POST(req: Request) {
   const parsed = parseGiftInput(await req.json().catch(() => null));
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
 
-  const d = parsed.data;
-  const { rows } = await pool.query<{ id: number }>(
-    `INSERT INTO gifts (name, village, kind, amount, gift_item)
-     VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-    [d.name, d.village, d.kind, d.amount, d.giftItem]
-  );
-  return NextResponse.json({ id: rows[0].id }, { status: 201 });
+  const created = await prisma.gift.create({
+    data: parsed.data,
+    select: { id: true },
+  });
+  return NextResponse.json({ id: created.id }, { status: 201 });
 }

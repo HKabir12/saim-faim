@@ -1,0 +1,28 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Kind {
+  cash
+  gift
+}
+
+model Gift {
+  id        Int      @id @default(autoincrement())
+  name      String
+  village   String
+  kind      Kind
+  amount    Int?
+  giftItem  String?  @map("gift_item")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([name])
+  @@index([village])
+  @@map("gifts")
+}
