@@ -34,9 +34,17 @@ export default function Home() {
           <Countdown />
         </div>
 
-        <Link href="/login" className="btn-gold mt-12 px-8">
-          এডমিন লগইন
-        </Link>
+        <div className="mt-12 flex flex-wrap justify-center gap-3">
+          <Link href="/list" className="btn-gold px-8">
+            তালিকা দেখুন
+          </Link>
+          <Link
+            href="/login"
+            className="btn border border-gold/50 px-8 text-gold-300 hover:bg-gold hover:text-pine-900"
+          >
+            এডমিন লগইন
+          </Link>
+        </div>
       </section>
     </main>
   );
